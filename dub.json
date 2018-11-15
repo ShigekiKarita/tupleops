@@ -1,0 +1,9 @@
+{
+    "description": "typecons operations",
+    "license": "BSL-1.0",
+    "authors": [
+        "Shigeki Karita"
+    ],
+    "copyright": "Copyright © 2018, Shigeki Karita",
+    "name": "tupleops"
+}
