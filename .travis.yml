@@ -1,0 +1,23 @@
+sudo: false
+
+os:
+  - linux
+
+language: d
+
+d:
+  - dmd
+  - dmd-beta
+  - dmd-nightly
+  - ldc
+  - ldc-beta
+
+allow_failures:
+    - {d: dmd-nightly}
+    - {d: ldc-beta}
+
+script:
+  - dub test -b=unittest-cov
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

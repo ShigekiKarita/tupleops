@@ -1,7 +1,9 @@
-!*
+*
 !*/
 !*.d
 !*.md
+!.travis.yml
+!.gitignore
 
 .dub
 docs.json
