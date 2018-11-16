@@ -3,15 +3,27 @@ module tupleops;
 import std.stdio;
 import std.typecons;
 
+
 private auto _mapImpl(alias func, Ts...)(return auto ref Ts ts)
 {
+    import std.traits : Parameters;
+
     static if (isTuple!(typeof(ts[0])))
     {
         static if (ts.length == 1)
-            return tuple(_mapImpl!func(ts[0].expand));
+        {
+            static if (is(Tuple!(Parameters!func) == typeof(ts[0])))
+                return tuple(func(ts[0].expand));
+            else
+                return tuple(_mapImpl!func(ts[0].expand));
+        }
         else
-            return tuple(_mapImpl!func(ts[0].expand),
-                         _mapImpl!func(ts[1 .. $]).expand);
+            static if (is(Tuple!(Parameters!func) == typeof(ts[0])))
+                return tuple(func(ts[0].expand),
+                             _mapImpl!func(ts[1 .. $]).expand);
+            else
+                return tuple(_mapImpl!func(ts[0].expand),
+                             _mapImpl!func(ts[1 .. $]).expand);
     }
     else
     {
@@ -23,7 +35,7 @@ private auto _mapImpl(alias func, Ts...)(return auto ref Ts ts)
     }
 }
 
-/// simple map over tuple
+/// simple map over tuples
 auto map(alias func, Ts...)(return auto ref Ts ts)
 {
     return _mapImpl!func(ts)[0];
@@ -41,7 +53,49 @@ unittest
     static assert(map!(x => 2 * x)(t) ==
                   tuple(2, 4, tuple(6, tuple(tuple(8, 10), 12), 14)));
 
+    static assert(map!((int x, int y) => x + y)(tuple(1, 2)) == 3);
+    static assert(map!((int x, int y) => x + y)(
+                      tuple(tuple(1, 2),
+                            tuple(tuple(3, 4), tuple(5, 6))))
+                  == tuple(3, tuple(7, 11)));
 }
+
+/// equivalent to boost::hana::overload
+template overload(funcs ...)
+{
+    import std.traits : ReturnType, Parameters;
+
+    static foreach (f; funcs)
+    {
+        ReturnType!f overload(Parameters!f args)
+        {
+            return f(args);
+        }
+    }
+}
+
+///
+unittest
+{
+    import std.conv : to;
+    alias f = overload!(
+        (int i) => i.to!string,
+        (int i, int j) => i + j,
+        (double d) => d * 2);
+
+    static assert(f(1, -2) == -1);
+    static assert(f(1.0) == 2.0);
+    static assert(f(1) == "1");
+
+    enum t = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5.0), 6), 7.0));
+    static assert(map!f(t) == tuple(2.0, "2", tuple(6.0, tuple(tuple("4", 10.0), "6"), 14.0)));
+
+    // FIXME apply longest argument overload by getOverloads
+    enum t2 = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5), 6), 7.0));
+    writeln(map!f(t2)); //  == tuple(2.0, "2", tuple(6.0, tuple(tuple(9), "6"), 14.0)));
+
+}
+
 
 /// higher order function for mapping via depth-fisrt search
 auto depthFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
@@ -123,38 +177,6 @@ unittest
                            5,
                            6)));
     static assert(breadFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
-}
-
-
-/// equivalent to boost::hana::overload
-template overload(funcs ...)
-{
-    import std.traits : ReturnType, Parameters;
-
-    static foreach (f; funcs)
-    {
-        ReturnType!f overload(Parameters!f args)
-        {
-            return f(args);
-        }
-    }
-}
-
-///
-unittest
-{
-    import std.conv : to;
-    alias f = overload!(
-        (int i) => i.to!string,
-        (int i, int j) => i + j,
-        (double d) => d * 2);
-
-    static assert(f(1, -2) == -1);
-    static assert(f(1.0) == 2.0);
-    static assert(f(1) == "1");
-
-    enum t = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5.0), 6), 7.0));
-    static assert(map!f(t) == tuple(2.0, "2", tuple(6.0, tuple(tuple("4", 10.0), "6"), 14.0)));
 }
 
 /// flatten nested tuple into 1-d tuple with copies of elements
