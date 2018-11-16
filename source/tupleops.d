@@ -2,6 +2,7 @@ module tupleops;
 
 import std.typecons;
 
+/// higher order function for mapping via depth-fisrt search
 auto depthFirstMap(alias func, Ts ...)(return auto ref Ts ts)
 {
     static if (isTuple!(typeof(ts[0])))
@@ -30,22 +31,91 @@ auto depthFirstMap(alias func, Ts ...)(return auto ref Ts ts)
     }
 }
 
-auto flatten(Ts ...)(return auto ref Ts ts)
+/// depth-first map iterates by left-to-right search.
+unittest
 {
-    return depthFirstMap!((return auto ref x) => x)(ts);
+    enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
+    static assert(depthFirstMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
-auto ptrs(Ts ...)(return ref Ts ts)
+/// higher order function for mapping via bread-fisrt search
+auto breadFirstMap(alias func, Ts ...)(return auto ref Ts ts)
 {
-    return depthFirstMap!((return ref x) => &x)(ts);
+    static if (isTuple!(typeof(ts[0])))
+    {
+        static if (ts.length == 1)
+        {
+            return breadFirstMap!func(ts[0].expand);
+        }
+        else
+        {
+            return breadFirstMap!func(ts[1..$], ts[0].expand);
+        }
+    }
+    else
+    {
+        static if (ts.length == 1)
+        {
+            return tuple(func(ts[0]));
+        }
+        else
+        {
+            return tuple(func(ts[0]),
+                         breadFirstMap!func(ts[1..$]).expand);
+        }
+    }
 }
 
+/// bread-first map iterates by top-to-bottom search.
+unittest
+{
+    enum t = tuple(1,
+                   tuple(
+                       tuple(
+                           4,
+                           tuple(
+                               7)),
+                       2),
+                   tuple(
+                       3,
+                       tuple(
+                           5,
+                           6)));
+    static assert(breadFirstMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
+}
+
+/// alias for simplicity
+auto map(alias func, alias impl = depthFirstMap, Ts ...)(return auto ref Ts ts)
+{
+    return impl!(func, Ts)(ts);
+}
+
+// unittest
+// {
+//     enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
+//     static assert(map!(x => x * 2)(t) == tuple(2, "2", 6, "4", 10, "6", 14));
+// }
+
+///
+auto flatten(alias map = depthFirstMap, Ts ...)(return auto ref Ts ts)
+{
+    return map!((return auto ref x) => x)(ts);
+}
+
+///
+auto ptrs(alias map = depthFirstMap, Ts ...)(return ref Ts ts)
+{
+    return map!((return ref x) => &x)(ts);
+}
+
+///
 unittest
 {
     enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
     static assert(t.flatten == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
+///
 unittest
 {
     auto t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
@@ -59,21 +129,7 @@ unittest
     }
 }
 
-struct UnzipRange(Z)
-{
-    Z zipped;
-    alias Tp = typeof(Z.init.front());
-    const size_t length = Tp.length;
-
-    static auto opIndex(D...)(auto ref D i)
-    {
-        import std.array : array;
-        import std.algorithm : map;
-        return this.zipped.map!(x => x[i]);
-    }
-}
-
-
+///
 auto unzip(Z)(Z zipped)
 {
     import std.algorithm : map;
@@ -90,6 +146,7 @@ auto unzip(Z)(Z zipped)
         }());
 }
 
+///
 unittest
 {
     import std.algorithm : equal;
