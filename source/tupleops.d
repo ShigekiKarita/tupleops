@@ -63,15 +63,7 @@ unittest
 /// equivalent to boost::hana::overload
 template overload(funcs ...)
 {
-    import std.traits : ReturnType, Parameters;
-
-    static foreach (f; funcs)
-    {
-        ReturnType!f overload(Parameters!f args)
-        {
-            return f(args);
-        }
-    }
+    static foreach (f; funcs) alias overload = f;
 }
 
 ///
