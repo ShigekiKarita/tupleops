@@ -1,20 +1,61 @@
 module tupleops;
 
+import std.stdio;
 import std.typecons;
 
+private auto _mapImpl(alias func, Ts...)(return auto ref Ts ts)
+{
+    static if (isTuple!(typeof(ts[0])))
+    {
+        static if (ts.length == 1)
+            return tuple(_mapImpl!func(ts[0].expand));
+        else
+            return tuple(_mapImpl!func(ts[0].expand),
+                         _mapImpl!func(ts[1 .. $]).expand);
+    }
+    else
+    {
+        static if (ts.length == 1)
+            return tuple(func(ts[0]));
+        else
+            return tuple(func(ts[0]),
+                         _mapImpl!func(ts[1 .. $]).expand);
+    }
+}
+
+/// simple map over tuple
+auto map(alias func, Ts...)(return auto ref Ts ts)
+{
+    return _mapImpl!func(ts)[0];
+}
+
+///
+unittest
+{
+    enum t0 = tuple(1, 2, 3);
+    static assert(map!(x => x)(t0) == t0);
+    enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
+    static assert(map!(x => x)(t) == t);
+
+    assert(map!(x => 2 * x)(t0) == tuple(2, 4, 6));
+    static assert(map!(x => 2 * x)(t) ==
+                  tuple(2, 4, tuple(6, tuple(tuple(8, 10), 12), 14)));
+
+}
+
 /// higher order function for mapping via depth-fisrt search
-auto depthFirstMap(alias func, Ts ...)(return auto ref Ts ts)
+auto depthFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
 {
     static if (isTuple!(typeof(ts[0])))
     {
         static if (ts.length == 1)
         {
-            return depthFirstMap!func(ts[0].expand);
+            return depthFirstFlatMap!func(ts[0].expand);
         }
         else
         {
-            return tuple(depthFirstMap!func(ts[0].expand).expand,
-                         depthFirstMap!func(ts[1..$]).expand);
+            return tuple(depthFirstFlatMap!func(ts[0].expand).expand,
+                         depthFirstFlatMap!func(ts[1..$]).expand);
         }
     }
     else
@@ -26,7 +67,7 @@ auto depthFirstMap(alias func, Ts ...)(return auto ref Ts ts)
         else
         {
             return tuple(func(ts[0]),
-                         depthFirstMap!func(ts[1..$]).expand);
+                         depthFirstFlatMap!func(ts[1..$]).expand);
         }
     }
 }
@@ -35,21 +76,21 @@ auto depthFirstMap(alias func, Ts ...)(return auto ref Ts ts)
 unittest
 {
     enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
-    static assert(depthFirstMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
+    static assert(depthFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
 /// higher order function for mapping via bread-fisrt search
-auto breadFirstMap(alias func, Ts ...)(return auto ref Ts ts)
+auto breadFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
 {
     static if (isTuple!(typeof(ts[0])))
     {
         static if (ts.length == 1)
         {
-            return breadFirstMap!func(ts[0].expand);
+            return breadFirstFlatMap!func(ts[0].expand);
         }
         else
         {
-            return breadFirstMap!func(ts[1..$], ts[0].expand);
+            return breadFirstFlatMap!func(ts[1..$], ts[0].expand);
         }
     }
     else
@@ -61,7 +102,7 @@ auto breadFirstMap(alias func, Ts ...)(return auto ref Ts ts)
         else
         {
             return tuple(func(ts[0]),
-                         breadFirstMap!func(ts[1..$]).expand);
+                         breadFirstFlatMap!func(ts[1..$]).expand);
         }
     }
 }
@@ -81,31 +122,45 @@ unittest
                        tuple(
                            5,
                            6)));
-    static assert(breadFirstMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
+    static assert(breadFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
-/// alias for simplicity
-auto map(alias func, alias impl = depthFirstMap, Ts ...)(return auto ref Ts ts)
+
+/// equivalent to boost::hana::overload
+template overload(funcs ...)
 {
-    return impl!(func, Ts)(ts);
-}
+    import std.traits : ReturnType, Parameters;
 
-// unittest
-// {
-//     enum t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
-//     static assert(map!(x => x * 2)(t) == tuple(2, "2", 6, "4", 10, "6", 14));
-// }
+    static foreach (f; funcs)
+    {
+        ReturnType!f overload(Parameters!f args)
+        {
+            return f(args);
+        }
+    }
+}
 
 ///
-auto flatten(alias map = depthFirstMap, Ts ...)(return auto ref Ts ts)
+unittest
+{
+    import std.conv : to;
+    alias f = overload!(
+        (int i) => i.to!string,
+        (int i, int j) => i + j,
+        (double d) => d * 2);
+
+    static assert(f(1, -2) == -1);
+    static assert(f(1.0) == 2.0);
+    static assert(f(1) == "1");
+
+    enum t = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5.0), 6), 7.0));
+    static assert(map!f(t) == tuple(2.0, "2", tuple(6.0, tuple(tuple("4", 10.0), "6"), 14.0)));
+}
+
+/// flatten nested tuple into 1-d tuple with copies of elements
+auto flatten(alias map = depthFirstFlatMap, Ts ...)(return auto ref Ts ts)
 {
     return map!((return auto ref x) => x)(ts);
-}
-
-///
-auto ptrs(alias map = depthFirstMap, Ts ...)(return ref Ts ts)
-{
-    return map!((return ref x) => &x)(ts);
 }
 
 ///
@@ -115,12 +170,18 @@ unittest
     static assert(t.flatten == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
+/// flatten nested tuple into 1-d tuple with pointers of elements
+auto ptrs(alias map = depthFirstFlatMap, Ts ...)(return ref Ts ts)
+{
+    return map!((return ref x) => &x)(ts);
+}
+
 ///
 unittest
 {
     auto t = tuple(1, 2, tuple(3, tuple(tuple(4, 5), 6), 7));
     auto p = t.ptrs;
-    t[1] = 222;
+    *p[1] = 222;
     auto d = t.flatten;
     assert(d == tuple(1, 222, 3, 4, 5, 6, 7));
 
