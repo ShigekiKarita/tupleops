@@ -4,26 +4,57 @@ import std.stdio;
 import std.typecons;
 
 
-private auto _mapImpl(alias func, Ts...)(return auto ref Ts ts)
+private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto ref Ts ts)
 {
+    import std.string : replace;
     import std.traits : Parameters;
+    alias T = typeof(ts[0]);
 
-    static if (isTuple!(typeof(ts[0])))
+    struct S
+    {
+        alias f = func;
+    }
+
+    enum maxIdx = {
+        size_t maxIdx, maxLen;
+        foreach (i, _f; __traits(getOverloads, S, "f"))
+        {
+            auto plen = Parameters!(_f).length;
+            if (plen > maxLen)
+            {
+                maxIdx = i;
+                maxLen = plen;
+            }
+        }
+        return maxIdx;
+    }();
+
+    static foreach (i, _f; __traits(getOverloads, S, "f"))
+    {
+        static if (i == maxIdx)
+        {
+            alias MaxParam = Parameters!_f;
+        }
+    }
+
+    static if (isTuple!T)
     {
         static if (ts.length == 1)
         {
-            static if (is(Tuple!(Parameters!func) == typeof(ts[0])))
+            static if (is(Tuple!MaxParam == T))
                 return tuple(func(ts[0].expand));
             else
                 return tuple(_mapImpl!func(ts[0].expand));
         }
         else
-            static if (is(Tuple!(Parameters!func) == typeof(ts[0])))
+        {
+            static if (is(Tuple!MaxParam == T))
                 return tuple(func(ts[0].expand),
                              _mapImpl!func(ts[1 .. $]).expand);
             else
                 return tuple(_mapImpl!func(ts[0].expand),
                              _mapImpl!func(ts[1 .. $]).expand);
+        }
     }
     else
     {
@@ -82,10 +113,12 @@ unittest
     enum t = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5.0), 6), 7.0));
     static assert(map!f(t) == tuple(2.0, "2", tuple(6.0, tuple(tuple("4", 10.0), "6"), 14.0)));
 
-    // FIXME apply longest argument overload by getOverloads
-    enum t2 = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5), 6), 7.0));
-    writeln(map!f(t2)); //  == tuple(2.0, "2", tuple(6.0, tuple(tuple(9), "6"), 14.0)));
+    // apply longest argument overload
+    enum t1 = tuple(1.0, 2, tuple(3, 4));
+    static assert(map!f(t1)  == tuple(2.0, "2", 7));
 
+    enum t2 = tuple(1.0, 2, tuple(3.0, tuple(tuple(4, 5), 6), 7.0));
+    static assert(map!f(t2)  == tuple(2.0, "2", tuple(6.0, tuple(9, "6"), 14.0)));
 }
 
 
