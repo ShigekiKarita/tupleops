@@ -24,7 +24,7 @@ private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto re
             {
                 maxIdx = i;
                 maxLen = plen;
-            }
+     breadththFirstFlatMap       }
         }
         return maxIdx;
     }();
@@ -158,18 +158,18 @@ unittest
     static assert(depthFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
-/// higher order function for mapping via bread-fisrt search
-auto breadFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
+/// higher order function for mapping via breadth-fisrt search
+auto breadthFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
 {
     static if (isTuple!(typeof(ts[0])))
     {
         static if (ts.length == 1)
         {
-            return breadFirstFlatMap!func(ts[0].expand);
+            return breadthFirstFlatMap!func(ts[0].expand);
         }
         else
         {
-            return breadFirstFlatMap!func(ts[1..$], ts[0].expand);
+            return breadthFirstFlatMap!func(ts[1..$], ts[0].expand);
         }
     }
     else
@@ -181,12 +181,12 @@ auto breadFirstFlatMap(alias func, Ts ...)(return auto ref Ts ts)
         else
         {
             return tuple(func(ts[0]),
-                         breadFirstFlatMap!func(ts[1..$]).expand);
+                         breadthFirstFlatMap!func(ts[1..$]).expand);
         }
     }
 }
 
-/// bread-first map iterates by top-to-bottom search.
+/// breadth-first map iterates by top-to-bottom search.
 unittest
 {
     enum t = tuple(1,
@@ -201,7 +201,7 @@ unittest
                        tuple(
                            5,
                            6)));
-    static assert(breadFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
+    static assert(breadthFirstFlatMap!(x => x)(t) == tuple(1, 2, 3, 4, 5, 6, 7));
 }
 
 /// flatten nested tuple into 1-d tuple with copies of elements
