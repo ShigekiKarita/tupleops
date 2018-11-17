@@ -24,7 +24,7 @@ private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto re
             {
                 maxIdx = i;
                 maxLen = plen;
-     breadththFirstFlatMap       }
+            }
         }
         return maxIdx;
     }();
