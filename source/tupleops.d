@@ -3,16 +3,16 @@ module tupleops;
 import std.stdio;
 import std.typecons;
 
-template LongestOverloadParameters(alias func)
+template LongestOverload(alias func)
 {
-    import std.traits : Parameters;
+    private import std.traits : Parameters;
 
     struct S
     {
         alias f = func;
     }
 
-    enum maxIdx = {
+    enum maxIndex = {
         size_t maxIdx, maxLen;
         foreach (i, _f; __traits(getOverloads, S, "f"))
         {
@@ -28,18 +28,39 @@ template LongestOverloadParameters(alias func)
 
     static foreach (i, _f; __traits(getOverloads, S, "f"))
     {
-        static if (i == maxIdx)
+        static if (i == maxIndex)
         {
-            alias LongestOverloadParameters = Parameters!_f;
+            alias func = _f;
+            alias Types = Parameters!_f;
         }
     }
+}
+
+version (unittest)
+{
+    void f(int x) {}
+    void f(int x, int y) {}
+    void f(int x, int y, double z) {}
+}
+
+unittest
+{
+    import std.meta : AliasSeq;
+    static assert(is(LongestOverload!f.Types == AliasSeq!(int, int, double)));
+
+    alias g = overload!(
+        (int x) {},
+        (int x, int y) {},
+        (int x, int y, double z) {}
+        );
+    static assert(is(LongestOverload!g.Types == AliasSeq!(int, int, double)));
 }
 
 
 private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto ref Ts ts)
 {
     alias T = typeof(ts[0]);
-    enum isLongest = is(Tuple!(LongestOverloadParameters!func) == T);
+    enum isLongest = is(Tuple!(LongestOverload!func.Types) == T);
 
     static if (isTuple!T)
     {
