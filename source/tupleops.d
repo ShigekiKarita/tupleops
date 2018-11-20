@@ -3,12 +3,9 @@ module tupleops;
 import std.stdio;
 import std.typecons;
 
-
-private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto ref Ts ts)
+template LongestOverloadParameters(alias func)
 {
-    import std.string : replace;
     import std.traits : Parameters;
-    alias T = typeof(ts[0]);
 
     struct S
     {
@@ -33,22 +30,29 @@ private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto re
     {
         static if (i == maxIdx)
         {
-            alias MaxParam = Parameters!_f;
+            alias LongestOverloadParameters = Parameters!_f;
         }
     }
+}
+
+
+private auto _mapImpl(alias func, string mod = __MODULE__, Ts...)(return auto ref Ts ts)
+{
+    alias T = typeof(ts[0]);
+    enum isLongest = is(Tuple!(LongestOverloadParameters!func) == T);
 
     static if (isTuple!T)
     {
         static if (ts.length == 1)
         {
-            static if (is(Tuple!MaxParam == T))
+            static if (isLongest)
                 return tuple(func(ts[0].expand));
             else
                 return tuple(_mapImpl!func(ts[0].expand));
         }
         else
         {
-            static if (is(Tuple!MaxParam == T))
+            static if (isLongest)
                 return tuple(func(ts[0].expand),
                              _mapImpl!func(ts[1 .. $]).expand);
             else
