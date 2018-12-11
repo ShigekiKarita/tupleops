@@ -28,10 +28,14 @@ unittest
 }
 ```
 
-- map
+- foldLeft (non flat)
+- depthFirstFoldLeft
+- breadthFirstFoldLeft
+- map (non flat)
 - depthFirstFlatMap (used for flatten)
 - breadthFirstFlatMap
+- unzip
 - overload (useful for map functions)
 - flatten
 - ptrs
-- unzip
+
